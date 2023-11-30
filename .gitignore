@@ -78,3 +78,4 @@ UnityPlayer.so
 *.log
 
 New Terrain*.asset
+Packages/com.ptc.vuforia.engine-10.19.3.tgz

@@ -79,3 +79,7 @@ UnityPlayer.so
 
 New Terrain*.asset
 Packages/com.ptc.vuforia.engine-10.19.3.tgz
+
+Assets/Resources/VuforiaConfiguration.asset
+
+ProjectSettings/UnityConnectSettings.asset

@@ -17,7 +17,11 @@ public struct WsConfigFile{
 
 public class UrbanGenerator : MonoBehaviour{
     WebSocket ws;
-	public string ws_config = "Assets/Scripts/WebSockets/ws_config.xml";
+	
+	
+	private const string ws_boot_config = "Assets/Scripts/WebSockets/ws_config.xml";
+	public string ws_config = ws_boot_config;
+	private const string ws_config_EXAMPLE = "Assets/Scripts/WebSockets/ws_config_EXAMPLE.xml";
 	private string connection_string = "";
 	//TODO: test this in binbows
 	void OnEnable(){
@@ -25,16 +29,14 @@ public class UrbanGenerator : MonoBehaviour{
 				//fetch ws_config from xml from ws_config
 			XmlSerializer xml = new XmlSerializer(typeof(WsConfigFile));
 			//check if file exists
-			if(File.Exists(ws_config)){
-				if(ws_config ==  "Assets/Scripts/WebSockets/ws_config.xml"){
+			if(!File.Exists(ws_config)){
+				if(ws_config.Equals(ws_boot_config)){
 					Debug.Log("WebSocket Config is missing, creating default");
-					WsConfigFile k = new WsConfigFile();
-					k.host = "ws://localhost:8080";
-					using(FileStream stream = new FileStream(ws_config, FileMode.Create)) {
-						xml.Serialize(stream, k);
+					//clone ws_config_EXAMPLE.xml
+					if(File.Exists(ws_config_EXAMPLE)){
+						File.Copy(ws_config_EXAMPLE, ws_config);
+						return;
 					}
-
-					return;
 				}
 				Debug.Log("WebSocket Config is missing");			
 				return;
@@ -57,7 +59,7 @@ public class UrbanGenerator : MonoBehaviour{
 		
 	}
     void Start(){
-		ws = new WebSocket("ws://localhost:8080");
+		ws = new WebSocket(ws_config);
     }
 
     void Update(){

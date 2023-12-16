@@ -75,6 +75,9 @@ crashlytics-build.properties
 /[Aa]ssets/Resources/VuforiaConfiguration.asset
 
 /[Aa]ssets/Scripts/WebSockets/ws_config.xml
+/[Aa]ssets/Scripts/WebSockets/ws_config.xml.meta
+
+/[Aa]ssets/Packages
 
 UnityPlayer.so
 *.x86_64

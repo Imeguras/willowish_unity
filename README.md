@@ -49,7 +49,11 @@ https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity
 
 ### Nugget Dependancies 
 
-Now you should be able to install WebSocketSharp-netstandard, this is a dependency for the websocket client which is used for the RT communication.
+Now you should be able to install the nugget dependencies, youll need :
+* WebSocketSharp-netstandard(1.0.1)
+* NetTopologySuite(2.5.0)
+* NetTopologySuite.IO.GeoJSON4STJ(4.0.0)
+* System.Text.Json(8.0.0)
 
 <details>
 <summary>Configuring the websocket connections</summary>
@@ -57,6 +61,8 @@ Now you should be able to install WebSocketSharp-netstandard, this is a dependen
 You should copy and paste `Assets/Scripts/WebSockets/ws_config_EXAMPLE.xml` into a new file called `ws_config.xml`, point it to the backend(if you are outside the project unfortunately its over, theres nothing you can do about it) using the correct url.
 If you arent running it in localhost, ***use wss*** if not ***you should use ws***.
 </details>
+
+
 
 ### Setup Licenses VueForia
 TODO: 

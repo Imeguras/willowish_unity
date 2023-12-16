@@ -1,3 +1,4 @@
-<ws_config>
-	<host>wss://127.0.0.1/<host/>
-<ws_config/>
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+	<host>wss://127.0.0.1/</host>
+</Root>

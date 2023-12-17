@@ -77,6 +77,8 @@ public class UrbanGenerator : MonoBehaviour{
 		StartCoroutine(CheckLatency());
 		//wait for StartCoroutine(CheckLatency()) to finish
 
+		MeshGeneratorAid.setup(new Vector3(0,0,0));
+
 		StartCoroutine(GetCube());
 
 
@@ -133,10 +135,10 @@ public class UrbanGenerator : MonoBehaviour{
 	public IEnumerator parsingCoordinates(string s){
 		
 		List<Buildings> values = JsonSerializer.Deserialize<List<Buildings>>(s, json_options);
-		foreach(Buildings b in values){
-			Debug.Log(b.height);
+		foreach (Buildings item in values){
+			MeshGeneratorAid.UpdateMesh(item);
 		}
-
+		
 		yield return null;
 	}
     void Update(){

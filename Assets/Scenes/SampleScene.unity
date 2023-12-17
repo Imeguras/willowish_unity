@@ -454,7 +454,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7b3a654350c13701b84f18d4faeaabf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  latency: 0
   ws_config: Assets/Scripts/WebSockets/ws_config.xml
+  connection_string: 
 --- !u!1 &1187208014
 GameObject:
   m_ObjectHideFlags: 0

@@ -60,8 +60,6 @@ public static class MeshGeneratorAid {
 				break; 
 			}
 			//the incoming order is anticlockwise from the bottom right corner
-			
-			Debug.Log("Point "+ count+":"+coord.X+","+coord.Y);
 			var new_vct = new Vector3((float)coord.X, (float)0, (float)coord.Y);
 			new_vertices.Add(new_vct);
 			//vertex[(vertex.Length-1) - count] = new_vct;
@@ -119,7 +117,7 @@ public static class MeshGeneratorAid {
 	static List<Vector3> genNormals(List<List<Vector3>> faces){
 		List<Vector3> normals = new List<Vector3>();
 		for(int i=0; i<faces.Count; i++){
-			Debug.Log("face "+i);
+			
 			var face = faces[i];
 			
 			const int _a =0;
@@ -189,25 +187,27 @@ public static class MeshGeneratorAid {
 			
 			List<int> new_triangles = Triangulate(face);
 			
-
-			for(int i=0; i<new_triangles.Count; i++){
+			int a = new_triangles.Count;
+			
+			for(int i=0; i<a; i++){
 				new_triangles[i] += offset;
 
 				triangles.Add(new_triangles[i]);
 				
 			}
+			
 			offset += face.Count;
 			
 		}
+		
 		return triangles;
 
 	}
 	static List<List<Vector3>> generate25Dvertices(List<Vector3> vertices, double height, ref Vector3[]? buffer){
 		List<List<Vector3>> threeDimObject = new List<List<Vector3>>();
 		//start with base
-		threeDimObject.Add(vertices);
+		
 		List<Vector3> topVertices = new List<Vector3>();
-		List<Vector3> baseVertices = new List<Vector3>();
 		Vector3? oldVertex=null;
 		foreach(var vertex in vertices){
 			//first add the top vertices
@@ -218,13 +218,22 @@ public static class MeshGeneratorAid {
 				face.Add(new Vector3(vertex.x, (float)height, vertex.z));
 				face.Add(new Vector3(((Vector3)oldVertex).x, (float)height, ((Vector3)oldVertex).z));
 				threeDimObject.Add(face);
+			}else{
+				List<Vector3> face = new List<Vector3>();
+				face.Add(vertex);
+				face.Add(new Vector3(((Vector3)vertices[vertices.Count-1]).x, (float)0, ((Vector3)vertices[vertices.Count-1]).z));
+				face.Add(new Vector3(vertex.x, (float)height, vertex.z));
+				face.Add(new Vector3(((Vector3)vertices[vertices.Count-1]).x, (float)height, ((Vector3)vertices[vertices.Count-1]).z));
+				threeDimObject.Add(face);
 			}
-			baseVertices.Add(new Vector3(vertex.x, (float)0, vertex.z));
+			
 			topVertices.Add(new Vector3(vertex.x, (float)height, vertex.z));	
 			oldVertex = vertex;
 		}
+		threeDimObject.Add(vertices);
+
 		threeDimObject.Add(topVertices);
-		threeDimObject.Add(baseVertices);
+		// Already added threeDimObject.Add(baseVertices);
 		if (buffer != null){
 			//shameless grab meshFilter.mesh.vertices.Length
 			//TODO THIS SUCKS

@@ -69,39 +69,38 @@ public static class MeshGeneratorAid {
 			count--;
 		}
 		count = len_v-1;
-		var listOfFaces = generate25Dvertices(new_vertices, building.height);
-		foreach(var face in listOfFaces){
-			foreach(var v in face){
-				vertex[(vertex.Length-1) - count] = v;
-				count--;
-			}
-		}
-		count = len_v-1;
+		var listOfFaces = generate25Dvertices(new_vertices, building.height, ref vertex);
+		
 		mesher.vertices = vertex;
 		//Triangulate
 		List<int> new_triangles = deconstructAndTriangulateThree(listOfFaces);
-		Array.Resize(ref triangles, (triangles.Length)+ new_triangles.Count);
+		count = triangles.Length;
+		//Todo wtf? theres 30 positions 
+		//Debug.Log((triangles.Length)+new_triangles.Count);
+		Array.Resize(ref triangles, (triangles.Length)+new_triangles.Count);
 		int i = 0;
+		
 		foreach(var triangle in new_triangles){
-			triangles[(triangles.Length-1) +i] = triangle;
+			triangles[count+i] = triangle;
+
+		
+			i++;
+
+			
+		}
+
+		mesher.triangles = triangles;
+		var new_normals = genNormals(listOfFaces);
+	    count = normals.Length;
+		Array.Resize(ref normals, (normals.Length) + (new_normals.Count));
+		i = 0;
+		foreach(var normal in new_normals){
+			normals[count+i] = normal;
 			i++;
 		}
 
 
-		count = len_v-1;
-		mesher.triangles = triangles;
-		var new_normals = genNormals(listOfFaces);
-
-		Array.Resize(ref normals, (normals.Length) + (new_normals.Count));
-
-		foreach(var coord in building.geom.Coordinates){
-			if(count<0){
-				break; 
-			}
-			//normals[(normals.Length-1) - count*2] = Vector3.up;
-			normals[(normals.Length-1) - count] = new_normals[(new_normals.Count) - count];
-			count--;
-		}
+		
 		count = len_v-1;
 		mesher.normals = normals;
 
@@ -120,7 +119,9 @@ public static class MeshGeneratorAid {
 	static List<Vector3> genNormals(List<List<Vector3>> faces){
 		List<Vector3> normals = new List<Vector3>();
 		for(int i=0; i<faces.Count; i++){
+			Debug.Log("face "+i);
 			var face = faces[i];
+			
 			const int _a =0;
 			//this will work because every face regardless of the number of vertices it will always be contained in a 2d plane
 			var normal = Vector3.Cross(face[1]-face[0], face[3]-face[0]).normalized;
@@ -201,11 +202,12 @@ public static class MeshGeneratorAid {
 		return triangles;
 
 	}
-	static List<List<Vector3>> generate25Dvertices(List<Vector3> vertices, double height){
+	static List<List<Vector3>> generate25Dvertices(List<Vector3> vertices, double height, ref Vector3[]? buffer){
 		List<List<Vector3>> threeDimObject = new List<List<Vector3>>();
 		//start with base
 		threeDimObject.Add(vertices);
 		List<Vector3> topVertices = new List<Vector3>();
+		List<Vector3> baseVertices = new List<Vector3>();
 		Vector3? oldVertex=null;
 		foreach(var vertex in vertices){
 			//first add the top vertices
@@ -217,10 +219,24 @@ public static class MeshGeneratorAid {
 				face.Add(new Vector3(((Vector3)oldVertex).x, (float)height, ((Vector3)oldVertex).z));
 				threeDimObject.Add(face);
 			}
+			baseVertices.Add(new Vector3(vertex.x, (float)0, vertex.z));
 			topVertices.Add(new Vector3(vertex.x, (float)height, vertex.z));	
 			oldVertex = vertex;
 		}
 		threeDimObject.Add(topVertices);
+		threeDimObject.Add(baseVertices);
+		if (buffer != null){
+			//shameless grab meshFilter.mesh.vertices.Length
+			//TODO THIS SUCKS
+			var offset = 0;
+			foreach(var face in threeDimObject){
+				foreach(var vertex in face){
+					buffer[buffer.Length-(++offset)] = vertex;
+
+				}
+			}
+
+		}
 
 		return threeDimObject;
 	}

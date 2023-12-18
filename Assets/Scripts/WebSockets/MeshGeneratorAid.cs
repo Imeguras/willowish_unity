@@ -29,6 +29,8 @@ public static class MeshGeneratorAid {
 		//create new child 
 		var mesh = new GameObject("Mesh");
 		mesh.transform.parent = terra.transform;
+		//(inverse of pos)
+		terra.transform.localPosition = new Vector3(-pos.x, 0, -pos.z);
 		mesh.transform.localPosition = pos;
 
 		meshFilter = mesh.AddComponent<MeshFilter>();

@@ -8,10 +8,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using NetTopologySuite.Geometries;
-using WebSocketSharp;
+//using WebSocketSharp;
 using UnityEngine;
 using System.Globalization;
-
+using System.Net.WebSockets; 
 using willowish_unity.websockets.objects; 
 
 [XmlRoot("Root")]
@@ -82,88 +82,78 @@ public class UrbanGenerator : MonoBehaviour{
 		StartCoroutine(CheckLatency());
 		//wait for StartCoroutine(CheckLatency()) to finish
 		
-		var coords_vector = new Vector3((float)39.706731731638236,0,(float)-8.762576195269904);
+		var coords_vector = new Vector3((float)4823406.562075008,0,(float)-975453.8918469656);
 		MeshGeneratorAid.setup(coords_vector);
 		//{"lat":39.706731731638236, "lon":-8.762576195269904, "range": 100}
-		//StartCoroutine(GetMesh(coords_vector, 10)); 
-		StartCoroutine(GetCube());
+		StartCoroutine(GetMesh(coords_vector, 10)); 
+		//StartCoroutine(GetCube());
 
 
     }
 	
 	public IEnumerator CheckLatency(){
-	 	bool dirtyMessage = false;
-		using (WebSocket ws = new WebSocket(connection_string+"echo")){
+	 	
+		
+		Uri uri = new(connection_string+"echo");
+
+		//using (WebSocket ws = new WebSocket(connection_string+"echo")){
 			float checkmark=0; 
 			//send current time and check if its returned
-			ws.OnMessage += (sender, e) =>{
-				string s = e.Data.ToString();
-				float.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out checkmark);
-				dirtyMessage = true;
-				
-			};
-			ws.OnError += (sender, e) => {
-				Debug.Log("Error: "+e.Message);
-			};
-			ws.Connect();
+			using (ClientWebSocket ws = new ClientWebSocket()){
+				var conn= ws.ConnectAsync(uri, default);
+				yield return new WaitUntil(()=> conn.IsCompleted);
+				ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(Time.deltaTime.ToString())), System.Net.WebSockets.WebSocketMessageType.Text, true, default);				
+				var bytes = new byte[1024 * 4];
+				var result =  ws.ReceiveAsync(bytes, default);
+				yield return new WaitUntil(()=> result.IsCompleted);
+				var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
+				float.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out checkmark);
+				latency = (double)((checkmark*1000)-(Time.deltaTime*1000));
+				Debug.Log("Latency: "+latency);
+			}
 			
-			ws.Send(Time.deltaTime.ToString());			
-			
-			yield return new WaitUntil(() => dirtyMessage == true);
-			latency = (double)((checkmark*1000)-(Time.deltaTime*1000));
-			Debug.Log("Latency: "+latency);
-			dirtyMessage= false; 
-			
-		}
+		
 
 	}
 	public IEnumerator GetCube(){
-		bool dirtyMessage = false;
-		using (WebSocket ws = new WebSocket(connection_string+"cube")){
-			string s="";
-			ws.OnMessage += (sender, e) =>{
-				s = e.Data.ToString();
-				dirtyMessage = true;
-			};
-			ws.OnError += (sender, e) => {
-				Debug.Log("Error: "+e.Message);
-			};
-			ws.Connect();
-			yield return new WaitUntil(() => dirtyMessage == true);
-			dirtyMessage= false;
-			Debug.Log(s);
-			StartCoroutine(parsingCoordinates(s));
+		Uri uri = new(connection_string+"cube");
+		using (ClientWebSocket ws = new ClientWebSocket()){
+			
+			var conn= ws.ConnectAsync(uri, default);
+			yield return new WaitUntil(()=> conn.IsCompleted);
+			var bytes = new byte[1024 * 4];
+			var result = ws.ReceiveAsync(bytes, default);
+			yield return new WaitUntil(()=> result.IsCompleted);
 
-		
-			//string is json
-			//{"$id":"1","id":0,"height":1,"geom":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0],[0,0]]]},"center":null,"comments":""}
-
+			var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
+			Debug.Log(str);
+			StartCoroutine(parsingCoordinates(str));
 		}
 	}
 	public IEnumerator GetMesh(Vector3 coords, double range){
-		bool dirtyMessage = false;
-		using (WebSocket ws = new WebSocket(connection_string+"mesh")){
-			string s="";
-			ws.OnMessage += (sender, e) =>{
-				s = e.Data.ToString();
-				dirtyMessage = true;
-			};
-			ws.OnError += (sender, e) => {
-				Debug.Log("Error: "+e.Message);
-			};
-			ws.Connect();
+		Uri uri = new(connection_string+"mesh");
+		using (ClientWebSocket ws = new ClientWebSocket()){
+			
+			var conn= ws.ConnectAsync(uri, default);
+			yield return new WaitUntil(()=> conn.IsCompleted);
 			var send = new MeshRequest{
 				lat = coords.x,
 				//TODO fix this
 				lon = coords.z,
 				range = range
 			};
-			string json = JsonSerializer.Serialize(send, json_options);
+			//string json = JsonSerializer.Serialize<MeshRequest>(send, json_options);
+			//string json = $"{{\"lat\":{coords.x}, \"lon\":{coords.z}, \"range\": {range} }}";
+			//sometimes you just need a little less gun
+			string json = "{\"lat\":39.706731731638236, \"lon\":-8.762576195269904, \"range\": 10}";
 			Debug.Log(json);
-			ws.Send(json);
+			ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(json)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
+			var bytes = new byte[1024 * 4];
 			
-			yield return new WaitUntil(() => dirtyMessage == true);
-			dirtyMessage= false;
+			var result = ws.ReceiveAsync(bytes, default);
+			yield return new WaitUntil(()=> result.IsCompleted);
+			
+			var s = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
 			Debug.Log(s);
 			StartCoroutine(parsingCoordinates(s));
 

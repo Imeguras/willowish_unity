@@ -72,6 +72,12 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+/[Aa]ssets/Resources/VuforiaConfiguration.asset
+
+/[Aa]ssets/Scripts/WebSockets/ws_config.xml
+/[Aa]ssets/Scripts/WebSockets/ws_config.xml.meta
+
+/[Aa]ssets/Packages
 
 UnityPlayer.so
 *.x86_64
@@ -79,3 +85,7 @@ UnityPlayer.so
 
 New Terrain*.asset
 Packages/com.ptc.vuforia.engine-10.19.3.tgz
+
+
+
+ProjectSettings/UnityConnectSettings.asset

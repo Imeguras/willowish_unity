@@ -53,8 +53,10 @@ public static class MeshGeneratorAid {
 		int len_v = building.geom.Coordinates.Length-1;
 		int count = len_v-1;
 		
-		Array.Resize(ref vertex, (vertex.Length) + ((len_v*len_v)+(2*len_v)));
+		//Array.Resize(ref vertex, (vertex.Length) + ((len_v*len_v)+(2*len_v)));
+		Array.Resize(ref vertex, (vertex.Length) + len_v);
 		Debug.Log(vertex.Length);
+		
 		List<Vector3> new_vertices = new List<Vector3>();
 
 		foreach(var coord in building.geom.Coordinates){
@@ -103,8 +105,9 @@ public static class MeshGeneratorAid {
 		
 		count = len_v-1;
 		mesher.normals = normals;
-
-		Array.Resize(ref uvs, uvs.Length + ((len_v*len_v)+(2*len_v)));
+		Array.Resize(ref uvs, uvs.Length + len_v);
+		
+		//Array.Resize(ref uvs, uvs.Length + ((len_v*len_v)+(2*len_v)));
 		//copy the uvs from the vertices 
 		for(int j=0; j<vertex.Length; j++){
 			uvs[j] = new Vector2(vertex[j].x, vertex[j].z);
@@ -131,6 +134,7 @@ public static class MeshGeneratorAid {
 			}
 			
 		}
+		Debug.Log("Normals"+normals.Count);
 		return normals;
 
 	}
@@ -211,7 +215,7 @@ public static class MeshGeneratorAid {
 		
 		List<Vector3> topVertices = new List<Vector3>();
 		Vector3? oldVertex=null;
-		foreach(var vertex in vertices){
+		/*foreach(var vertex in vertices){
 			//first add the top vertices
 			if(oldVertex != null){
 				List<Vector3> face = new List<Vector3>();
@@ -231,10 +235,10 @@ public static class MeshGeneratorAid {
 			
 			topVertices.Add(new Vector3(vertex.x, (float)height, vertex.z));	
 			oldVertex = vertex;
-		}
+		}*/
 		threeDimObject.Add(vertices);
 
-		threeDimObject.Add(topVertices);
+		//threeDimObject.Add(topVertices);
 		// Already added threeDimObject.Add(baseVertices);
 		if (buffer != null){
 			//shameless grab meshFilter.mesh.vertices.Length

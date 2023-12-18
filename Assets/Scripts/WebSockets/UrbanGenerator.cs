@@ -20,6 +20,11 @@ public struct WsConfigFile{
 	public string host;
 }
 
+public struct MeshRequest{
+	public double lat;
+	public double lon;
+	public double range;
+}
     //TODO Might have to be rewritten entirely 
 public class UrbanGenerator : MonoBehaviour{
 
@@ -76,9 +81,11 @@ public class UrbanGenerator : MonoBehaviour{
     void Start(){
 		StartCoroutine(CheckLatency());
 		//wait for StartCoroutine(CheckLatency()) to finish
-
-		MeshGeneratorAid.setup(new Vector3(0,0,0));
-
+		
+		var coords_vector = new Vector3((float)39.706731731638236,0,(float)-8.762576195269904);
+		MeshGeneratorAid.setup(coords_vector);
+		//{"lat":39.706731731638236, "lon":-8.762576195269904, "range": 100}
+		//StartCoroutine(GetMesh(coords_vector, 10)); 
 		StartCoroutine(GetCube());
 
 
@@ -99,6 +106,7 @@ public class UrbanGenerator : MonoBehaviour{
 				Debug.Log("Error: "+e.Message);
 			};
 			ws.Connect();
+			
 			ws.Send(Time.deltaTime.ToString());			
 			
 			yield return new WaitUntil(() => dirtyMessage == true);
@@ -121,6 +129,39 @@ public class UrbanGenerator : MonoBehaviour{
 				Debug.Log("Error: "+e.Message);
 			};
 			ws.Connect();
+			yield return new WaitUntil(() => dirtyMessage == true);
+			dirtyMessage= false;
+			Debug.Log(s);
+			StartCoroutine(parsingCoordinates(s));
+
+		
+			//string is json
+			//{"$id":"1","id":0,"height":1,"geom":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0],[0,0]]]},"center":null,"comments":""}
+
+		}
+	}
+	public IEnumerator GetMesh(Vector3 coords, double range){
+		bool dirtyMessage = false;
+		using (WebSocket ws = new WebSocket(connection_string+"mesh")){
+			string s="";
+			ws.OnMessage += (sender, e) =>{
+				s = e.Data.ToString();
+				dirtyMessage = true;
+			};
+			ws.OnError += (sender, e) => {
+				Debug.Log("Error: "+e.Message);
+			};
+			ws.Connect();
+			var send = new MeshRequest{
+				lat = coords.x,
+				//TODO fix this
+				lon = coords.z,
+				range = range
+			};
+			string json = JsonSerializer.Serialize(send, json_options);
+			Debug.Log(json);
+			ws.Send(json);
+			
 			yield return new WaitUntil(() => dirtyMessage == true);
 			dirtyMessage= false;
 			Debug.Log(s);

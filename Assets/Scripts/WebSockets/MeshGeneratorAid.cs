@@ -37,6 +37,8 @@ public static class MeshGeneratorAid {
 		meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
 		
 	}
+	//TODO: this is garbage and needs to be cleaned up
+	//TOOPTIMIZE: this could be done via shader which will balance the load 
 	public static void UpdateMesh(Buildings building){
 		Mesh mesher = meshFilter.mesh;
 
@@ -49,7 +51,7 @@ public static class MeshGeneratorAid {
 		int len_v = building.geom.Coordinates.Length-1;
 		int count = len_v-1;
 		
-		Array.Resize(ref vertex, (vertex.Length) + (len_v));
+		Array.Resize(ref vertex, (vertex.Length) + ((len_v*len_v)+(2*len_v)));
 		Debug.Log(vertex.Length);
 		List<Vector3> new_vertices = new List<Vector3>();
 
@@ -62,48 +64,74 @@ public static class MeshGeneratorAid {
 			Debug.Log("Point "+ count+":"+coord.X+","+coord.Y);
 			var new_vct = new Vector3((float)coord.X, (float)0, (float)coord.Y);
 			new_vertices.Add(new_vct);
-			vertex[(vertex.Length-1) - count] = new_vct;
+			//vertex[(vertex.Length-1) - count] = new_vct;
 			//vertex[vertex.Length - count] = new Vector3((float)coord.X, (float)building.height, (float)coord.Y);
 			count--;
 		}
-		count = len_v;
+		count = len_v-1;
+		var listOfFaces = generate25Dvertices(new_vertices, building.height);
+		foreach(var face in listOfFaces){
+			foreach(var v in face){
+				vertex[(vertex.Length-1) - count] = v;
+				count--;
+			}
+		}
+		count = len_v-1;
 		mesher.vertices = vertex;
-
-		Array.Resize(ref triangles, (triangles.Length) + (len_v*2));
 		//Triangulate
-		
-		
-		List<int> new_triangles = Triangulate(new_vertices);
-		triangles = new_triangles.ToArray();
+		List<int> new_triangles = deconstructAndTriangulateThree(listOfFaces);
+		Array.Resize(ref triangles, (triangles.Length)+ new_triangles.Count);
+		int i = 0;
+		foreach(var triangle in new_triangles){
+			triangles[(triangles.Length-1) +i] = triangle;
+			i++;
+		}
+
 
 		count = len_v-1;
 		mesher.triangles = triangles;
-		Array.Resize(ref normals, (normals.Length) + (len_v));
+		var new_normals = genNormals(listOfFaces);
+
+		Array.Resize(ref normals, (normals.Length) + (new_normals.Count));
+
 		foreach(var coord in building.geom.Coordinates){
 			if(count<0){
 				break; 
 			}
 			//normals[(normals.Length-1) - count*2] = Vector3.up;
-			normals[(normals.Length-1) - count] = Vector3.up;
+			normals[(normals.Length-1) - count] = new_normals[(new_normals.Count) - count];
 			count--;
 		}
 		count = len_v-1;
 		mesher.normals = normals;
 
-		Array.Resize(ref uvs, uvs.Length + (len_v));
-		foreach(var coord in building.geom.Coordinates){
-			if(count<0){
-				break; 
-			}
-			uvs[(uvs.Length-1) - count] = new Vector2((float)coord.X,(float)coord.Y);
-			count--;
+		Array.Resize(ref uvs, uvs.Length + ((len_v*len_v)+(2*len_v)));
+		//copy the uvs from the vertices 
+		for(int j=0; j<vertex.Length; j++){
+			uvs[j] = new Vector2(vertex[j].x, vertex[j].z);
 		}
-		count = len_v;
+
 		mesher.uv = uvs;
 
 		meshFilter.mesh = mesher;
 
 		//dd building.geom.Coordinates to vertex
+	}
+	static List<Vector3> genNormals(List<List<Vector3>> faces){
+		List<Vector3> normals = new List<Vector3>();
+		for(int i=0; i<faces.Count; i++){
+			var face = faces[i];
+			const int _a =0;
+			//this will work because every face regardless of the number of vertices it will always be contained in a 2d plane
+			var normal = Vector3.Cross(face[1]-face[0], face[3]-face[0]).normalized;
+			for(int _j=0; _j<face.Count; _j++){
+				//annoyingly add the same normal for each vertex in the face	
+				normals.Add(normal);
+			}
+			
+		}
+		return normals;
+
 	}
 	static List<int> Triangulate(List<Vector3> vertices){
         List<int> triangles = new List<int>();
@@ -153,6 +181,49 @@ public static class MeshGeneratorAid {
 
         return triangles;
     }
+	static List<int> deconstructAndTriangulateThree(List<List<Vector3>> threeDimObject){
+		List<int> triangles = new List<int>();
+		int offset =0;
+		foreach(var face in threeDimObject){
+			
+			List<int> new_triangles = Triangulate(face);
+			
+
+			for(int i=0; i<new_triangles.Count; i++){
+				new_triangles[i] += offset;
+
+				triangles.Add(new_triangles[i]);
+				
+			}
+			offset += face.Count;
+			
+		}
+		return triangles;
+
+	}
+	static List<List<Vector3>> generate25Dvertices(List<Vector3> vertices, double height){
+		List<List<Vector3>> threeDimObject = new List<List<Vector3>>();
+		//start with base
+		threeDimObject.Add(vertices);
+		List<Vector3> topVertices = new List<Vector3>();
+		Vector3? oldVertex=null;
+		foreach(var vertex in vertices){
+			//first add the top vertices
+			if(oldVertex != null){
+				List<Vector3> face = new List<Vector3>();
+				face.Add((Vector3)oldVertex);
+				face.Add(vertex);
+				face.Add(new Vector3(vertex.x, (float)height, vertex.z));
+				face.Add(new Vector3(((Vector3)oldVertex).x, (float)height, ((Vector3)oldVertex).z));
+				threeDimObject.Add(face);
+			}
+			topVertices.Add(new Vector3(vertex.x, (float)height, vertex.z));	
+			oldVertex = vertex;
+		}
+		threeDimObject.Add(topVertices);
+
+		return threeDimObject;
+	}
 	static bool IsEar(List<int> vertexIndices, int earTipIndex, int prevIndex, int nextIndex, List<Vector3> vertices){
         Vector3 earTip = vertices[vertexIndices[earTipIndex]];
         Vector3 prevVertex = vertices[vertexIndices[prevIndex]];

@@ -60,19 +60,20 @@ public static class MeshGeneratorAid {
 		List<Vector3> new_vertices = new List<Vector3>();
 
 		foreach(var coord in building.geom.Coordinates){
-			if(count<0){
-				break; 
-			}
+		
 			//the incoming order is anticlockwise from the bottom right corner
 			var new_vct = new Vector3((float)coord.X, (float)0, (float)coord.Y);
 			new_vertices.Add(new_vct);
-			//vertex[(vertex.Length-1) - count] = new_vct;
-			//vertex[vertex.Length - count] = new Vector3((float)coord.X, (float)building.height, (float)coord.Y);
-			count--;
 		}
-		count = len_v-1;
-		var listOfFaces = generate25Dvertices(new_vertices, building.height, ref vertex);
+		//remove last 
+		new_vertices.RemoveAt(new_vertices.Count-1);
+		//reverse the order
+		new_vertices.Reverse();
 		
+
+		var listOfFaces = generate25Dvertices(new_vertices, building.height, ref vertex);
+		Debug.Log("Faces"+listOfFaces.Count);
+		Debug.Log("Vertices Buffer"+vertex.Length);
 		mesher.vertices = vertex;
 		//Triangulate
 		List<int> new_triangles = deconstructAndTriangulateThree(listOfFaces);
@@ -116,6 +117,9 @@ public static class MeshGeneratorAid {
 		mesher.uv = uvs;
 
 		meshFilter.mesh = mesher;
+		//meshFilter.mesh.Optimize();
+		//meshFilter.mesh.RecalculateBounds();
+		//meshFilter.mesh.RecalculateNormals();
 
 		//dd building.geom.Coordinates to vertex
 	}
@@ -127,8 +131,9 @@ public static class MeshGeneratorAid {
 			
 			const int _a =0;
 			//this will work because every face regardless of the number of vertices it will always be contained in a 2d plane
-			var normal = Vector3.Cross(face[1]-face[0], face[3]-face[0]).normalized;
+			var normal = Vector3.Cross(face[1]-face[0], face[2]-face[0]).normalized;
 			for(int _j=0; _j<face.Count; _j++){
+				
 				//annoyingly add the same normal for each vertex in the face	
 				normals.Add(normal);
 			}
@@ -136,8 +141,29 @@ public static class MeshGeneratorAid {
 		}
 		Debug.Log("Normals"+normals.Count);
 		return normals;
+	}
+	
+	static List<int> Triangulate(List<Vector3> vertices){
+		
+
+			
+			List<int> triangles = new List<int>();
+			//convert vertices to Ipoint list
+			List<DelaunatorSharp.IPoint> points = new List<DelaunatorSharp.IPoint>();
+			foreach(var vertex in vertices){
+				points.Add(new DelaunatorSharp.Point(vertex.x, vertex.z));
+			}
+
+			DelaunatorSharp.Delaunator delaunator = new DelaunatorSharp.Delaunator(points.ToArray());
+			for(int i=0; i<delaunator.Triangles.Length; i++){
+				triangles.Add(delaunator.Triangles[i]);
+			}
+			return triangles;
+		
 
 	}
+
+	/**
 	static List<int> Triangulate(List<Vector3> vertices){
         List<int> triangles = new List<int>();
         int vertexCount = vertices.Count;
@@ -155,23 +181,27 @@ public static class MeshGeneratorAid {
         }
 
         int earTipIndex;
-        while (vertexCount > 3)
-        {
-            for (int i = 0; i < vertexCount; i++)
-            {
-                int prevIndex = (i - 1 + vertexCount) % vertexCount;
-                int nextIndex = (i + 1) % vertexCount;
+		triangles.Add(vertexIndices[0]);
+        triangles.Add(vertexIndices[1]);
+		triangles.Add(vertexIndices[2]);
+       
+        while (vertexCount > 3){
+		
+            for (int i = 0; i < vertexCount; i++){
+                
+				int prevIndex = (i - 1 + vertexCount) % vertexCount;
+				
+				int nextIndex = (i + 1) % vertexCount;
 
                 bool isEar = IsEar(vertexIndices, i, prevIndex, nextIndex, vertices);
 
-                if (isEar)
-                {
+                if (isEar){
                     earTipIndex = i;
-
-                    triangles.Add(vertexIndices[prevIndex]);
+					triangles.Add(vertexIndices[prevIndex]);
                     triangles.Add(vertexIndices[earTipIndex]);
                     triangles.Add(vertexIndices[nextIndex]);
-
+					
+                    
                     vertexIndices.RemoveAt(earTipIndex);
                     vertexCount--;
 
@@ -180,12 +210,30 @@ public static class MeshGeneratorAid {
             }
         }
 
-        triangles.Add(vertexIndices[0]);
-        triangles.Add(vertexIndices[1]);
-        triangles.Add(vertexIndices[2]);
+		
+        
 
         return triangles;
     }
+	
+	static bool IsEar(List<int> vertexIndices, int earTipIndex, int prevIndex, int nextIndex, List<Vector3> vertices){
+        Vector3 earTip = vertices[vertexIndices[earTipIndex]];
+        Vector3 prevVertex = vertices[vertexIndices[prevIndex]];
+        Vector3 nextVertex = vertices[vertexIndices[nextIndex]];
+        for (int i = 0; i < vertexIndices.Count; i++){
+            if (i != earTipIndex && i != prevIndex && i != nextIndex){
+                Vector3 testPoint = vertices[vertexIndices[i]];
+                if (IsPointInsideTriangle(earTip, prevVertex, nextVertex, testPoint)){
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+	**/
+	
+	
 	static List<int> deconstructAndTriangulateThree(List<List<Vector3>> threeDimObject){
 		List<int> triangles = new List<int>();
 		int offset =0;
@@ -246,7 +294,7 @@ public static class MeshGeneratorAid {
 			var offset = 0;
 			foreach(var face in threeDimObject){
 				foreach(var vertex in face){
-					buffer[buffer.Length-(++offset)] = vertex;
+					buffer[offset++] = vertex;
 
 				}
 			}
@@ -255,22 +303,7 @@ public static class MeshGeneratorAid {
 
 		return threeDimObject;
 	}
-	static bool IsEar(List<int> vertexIndices, int earTipIndex, int prevIndex, int nextIndex, List<Vector3> vertices){
-        Vector3 earTip = vertices[vertexIndices[earTipIndex]];
-        Vector3 prevVertex = vertices[vertexIndices[prevIndex]];
-        Vector3 nextVertex = vertices[vertexIndices[nextIndex]];
-        for (int i = 0; i < vertexIndices.Count; i++){
-            if (i != earTipIndex && i != prevIndex && i != nextIndex){
-                Vector3 testPoint = vertices[vertexIndices[i]];
-                if (IsPointInsideTriangle(earTip, prevVertex, nextVertex, testPoint)){
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
+	
     static bool IsPointInsideTriangle(Vector3 A, Vector3 B, Vector3 C, Vector3 P){
         float denominator = (B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y);
         float alpha = ((B.y - C.y) * (P.x - C.x) + (C.x - B.x) * (P.y - C.y)) / denominator;

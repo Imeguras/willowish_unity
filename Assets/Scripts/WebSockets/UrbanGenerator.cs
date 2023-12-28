@@ -81,8 +81,8 @@ public class UrbanGenerator : MonoBehaviour{
     void Start(){
 		StartCoroutine(CheckLatency());
 		//wait for StartCoroutine(CheckLatency()) to finish
-		
-		var coords_vector = new Vector3((float)4823406.562075008,0,(float)-975453.8918469656);
+		//
+		var coords_vector = new Vector3((float)-975453.8918469656,0,(float)4823406.562075008);
 		MeshGeneratorAid.setup(coords_vector);
 		//{"lat":39.706731731638236, "lon":-8.762576195269904, "range": 100}
 		StartCoroutine(GetMesh(coords_vector, 10)); 

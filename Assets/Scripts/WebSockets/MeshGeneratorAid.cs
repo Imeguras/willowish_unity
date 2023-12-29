@@ -33,7 +33,10 @@ public static class MeshGeneratorAid {
 		mesh.transform.parent = terra.transform;
 		//(inverse of pos)
 		terra.transform.localPosition = new Vector3(0,0,0);
-		mesh.transform.localPosition = new Vector3(0,0,0);
+		mesh.transform.localPosition = new Vector3(0,0,1);
+		//scale is 0.1
+		mesh.transform.localScale = new Vector3(0.05f,0.05f,0.05f);
+
 
 
 		meshFilter = mesh.AddComponent<MeshFilter>();

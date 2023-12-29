@@ -13,14 +13,22 @@ using UnityEngine;
 using System.Globalization;
 using System.Net.WebSockets; 
 using willowish_unity.websockets.objects; 
-
+using System.Threading.Tasks;
 [XmlRoot("Root")]
 public struct WsConfigFile{
 	[XmlElement("host")]
 	public string host;
 }
 
-public struct MeshRequest{
+public class TranslateRequest{
+	public double lat{get; set;}
+	public double lon{get; set;}
+	public TranslateRequest(double lat, double lon){
+		this.lat= lat; 
+		this.lon= lon;
+	}
+}
+public class MeshRequest{
 	public double lat;
 	public double lon;
 	public double range;
@@ -79,13 +87,19 @@ public class UrbanGenerator : MonoBehaviour{
 		
 	}
     void Start(){
-		StartCoroutine(CheckLatency());
-		//wait for StartCoroutine(CheckLatency()) to finish
-		//
-		var coords_vector = new Vector3((float)-975453.8918469656,0,(float)4823406.562075008);
-		MeshGeneratorAid.setup(coords_vector);
+		var latency = StartCoroutine(CheckLatency());
+		TranslateRequest coordsMetricSRID = new TranslateRequest(0,0);
+		coordsMetricSRID=getEncodedCoords(39.706731731638236, -8.762576195269904).Result; 
+		
+		
+		 
+		//Beware Longitude is X and latitude is Y in GIS software
+		//SEE https://gis.stackexchange.com/questions/11626/does-y-mean-latitude-and-x-mean-longitude-in-every-gis-software
+		var coords_vector = new Vector3((float)coordsMetricSRID.lon,0,(float)coordsMetricSRID.lat);
+		//MeshGeneratorAid.setup(coords_vector);
+		
 		//{"lat":39.706731731638236, "lon":-8.762576195269904, "range": 100}
-		StartCoroutine(GetMesh(coords_vector, 10)); 
+		//StartCoroutine(GetMesh(coords_vector, 10)); 
 		//StartCoroutine(GetCube());
 
 
@@ -110,6 +124,7 @@ public class UrbanGenerator : MonoBehaviour{
 				float.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out checkmark);
 				latency = (double)((checkmark*1000)-(Time.deltaTime*1000));
 				Debug.Log("Latency: "+latency);
+				yield return latency; 
 			}
 			
 		
@@ -127,9 +142,28 @@ public class UrbanGenerator : MonoBehaviour{
 
 			var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
 			Debug.Log(str);
-			StartCoroutine(parsingCoordinates(str));
+			StartCoroutine(dispatchMeshGeneration(str));
 		}
 	}
+
+	public async Task<TranslateRequest> getEncodedCoords(double lat, double lon ){
+		//send translate coords
+		Uri uri = new(connection_string+"translate");
+		using (ClientWebSocket ws = new ClientWebSocket()){
+			await ws.ConnectAsync(uri, default);
+			var send = new TranslateRequest(lat, lon);
+			string json = JsonSerializer.Serialize<TranslateRequest>(send, json_options);
+			await ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(json)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
+			var bytes = new byte[1024 * 4];
+			var result = await ws.ReceiveAsync(bytes, default);
+			var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Count);
+			//return decodeJSONPoint(str)
+			TranslateRequest ret = decodeJSONPoint(str);
+			//from completed ret
+			 return ret; 
+		}
+	}
+	
 	public IEnumerator GetMesh(Vector3 coords, double range){
 		Uri uri = new(connection_string+"mesh");
 		using (ClientWebSocket ws = new ClientWebSocket()){
@@ -155,7 +189,7 @@ public class UrbanGenerator : MonoBehaviour{
 			
 			var s = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
 			Debug.Log(s);
-			StartCoroutine(parsingCoordinates(s));
+			StartCoroutine(dispatchMeshGeneration(s));
 
 		
 			//string is json
@@ -163,7 +197,13 @@ public class UrbanGenerator : MonoBehaviour{
 
 		}
 	}
-	public IEnumerator parsingCoordinates(string s){
+	public TranslateRequest decodeJSONPoint(string s){
+		Point p = JsonSerializer.Deserialize<Point>(s, json_options);
+		TranslateRequest k = new TranslateRequest(p.Coordinate.Y, p.Coordinate.X);
+		return k;
+
+	}
+	public IEnumerator dispatchMeshGeneration(string s){
 		
 		List<Buildings> values = JsonSerializer.Deserialize<List<Buildings>>(s, json_options);
 		foreach (Buildings item in values){

@@ -8,18 +8,38 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using NetTopologySuite.Geometries;
-using WebSocketSharp;
+//using WebSocketSharp;
 using UnityEngine;
 using System.Globalization;
-
+using System.Net.WebSockets; 
 using willowish_unity.websockets.objects; 
-
+using System.Threading.Tasks;
 [XmlRoot("Root")]
 public struct WsConfigFile{
 	[XmlElement("host")]
 	public string host;
 }
 
+public class TranslateRequest{
+	public double lat{get; set;}
+	public double lon{get; set;}
+	public TranslateRequest(double lat, double lon){
+		this.lat= lat; 
+		this.lon= lon;
+	}
+}
+public class MeshRequest{
+	public double lat{get; set;}
+	public double lon{get; set;}
+	public double range{get; set;}
+	public MeshRequest(double lat, double lon, double range){
+		this.lat= lat; 
+		this.lon= lon;
+		this.range= range;
+	}
+	public MeshRequest():this(0,0,0){
+	}
+}
     //TODO Might have to be rewritten entirely 
 public class UrbanGenerator : MonoBehaviour{
 
@@ -37,8 +57,11 @@ public class UrbanGenerator : MonoBehaviour{
 	private const string ws_config_EXAMPLE = "Assets/Scripts/WebSockets/ws_config_EXAMPLE.xml";
 	[SerializeField]
 	private string connection_string = "";
+	[SerializeField]
+	private static TranslateRequest coords_internal; 
 	//TODO: test this in binbows
 	void OnEnable(){
+		coords_internal= new TranslateRequest(0,0);
 		json_options.Converters.Add(new NetTopologySuite.IO.Converters.GeoJsonConverterFactory());
 		try{
 				//fetch ws_config from xml from ws_config
@@ -74,57 +97,121 @@ public class UrbanGenerator : MonoBehaviour{
 		
 	}
     void Start(){
-		StartCoroutine(CheckLatency());
-		//wait for StartCoroutine(CheckLatency()) to finish
-
-		MeshGeneratorAid.setup(new Vector3(0,0,0));
-
-		StartCoroutine(GetCube());
-
+		StartCoroutine(threadedStart());
+		//{"lat":39.706731731638236, "lon":-8.762576195269904, "range": 100}
+		//
 
     }
+	private IEnumerator threadedStart(){
+		//GOD THIS IS EVEN WORSE WHY DID MICROSOFT REMOVE SYNCHRONOUS CALLS LIKE ITS A DEPRECATED THING
+		//ALSO THANK YOU UNITY FOR BEING SO HOSTILE TO ASYNC CALLS
+
+		StartCoroutine(CheckLatency());
+		Vector3 coord_initial = new Vector3((float)39.706731731638236, 0,(float)-8.762576195269904);
+		StartCoroutine(getEncodedCoords(coord_initial.x, coord_initial.z)); 
+		
+		//this is what microsoft forced me to do 
+		//while(coords_internal.lat == 0 && coords_internal.lon == 0){}
+		yield return new WaitUntil(()=> coords_internal.lat != 0 && coords_internal.lon != 0);
+
+		TranslateRequest coordsMetricSRID = coords_internal;
+		 
+		//Beware Longitude is X and latitude is Y in GIS software
+		//SEE https://gis.stackexchange.com/questions/11626/does-y-mean-latitude-and-x-mean-longitude-in-every-gis-software
+		var coords_vector = new Vector3((float)coordsMetricSRID.lon,0,(float)coordsMetricSRID.lat);
+		MeshGeneratorAid.setup(coords_vector);
+		//This is because the websocket takes in a degree based latitude/longitude
+		StartCoroutine(GetMesh(coord_initial, 10)); 
+		//StartCoroutine(GetCube());
+
+	}
 	
 	public IEnumerator CheckLatency(){
-	 	bool dirtyMessage = false;
-		using (WebSocket ws = new WebSocket(connection_string+"echo")){
+	 	
+		
+		Uri uri = new(connection_string+"echo");
+
+		//using (WebSocket ws = new WebSocket(connection_string+"echo")){
 			float checkmark=0; 
 			//send current time and check if its returned
-			ws.OnMessage += (sender, e) =>{
-				string s = e.Data.ToString();
-				float.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out checkmark);
-				dirtyMessage = true;
+			using (ClientWebSocket ws = new ClientWebSocket()){
+				var conn= ws.ConnectAsync(uri, default);
+				yield return new WaitUntil(()=> conn.IsCompleted);
+				var t= Time.fixedTime.ToString();
+				ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(t)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);				
+				var bytes = new byte[1024 * 4];
+				var result =  ws.ReceiveAsync(bytes, default);
+				yield return new WaitUntil(()=> result.IsCompleted);
+				var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
+				float.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out checkmark);
 				
-			};
-			ws.OnError += (sender, e) => {
-				Debug.Log("Error: "+e.Message);
-			};
-			ws.Connect();
-			ws.Send(Time.deltaTime.ToString());			
+				latency = (double)((checkmark*1000)-(Time.fixedTime*1000));
+				
+				Debug.Log("Latency(ms): "+latency);
+				
+			}
 			
-			yield return new WaitUntil(() => dirtyMessage == true);
-			latency = (double)((checkmark*1000)-(Time.deltaTime*1000));
-			Debug.Log("Latency: "+latency);
-			dirtyMessage= false; 
-			
-		}
+		
 
 	}
 	public IEnumerator GetCube(){
-		bool dirtyMessage = false;
-		using (WebSocket ws = new WebSocket(connection_string+"cube")){
-			string s="";
-			ws.OnMessage += (sender, e) =>{
-				s = e.Data.ToString();
-				dirtyMessage = true;
-			};
-			ws.OnError += (sender, e) => {
-				Debug.Log("Error: "+e.Message);
-			};
-			ws.Connect();
-			yield return new WaitUntil(() => dirtyMessage == true);
-			dirtyMessage= false;
+		Uri uri = new(connection_string+"cube");
+		using (ClientWebSocket ws = new ClientWebSocket()){
+			
+			var conn= ws.ConnectAsync(uri, default);
+			yield return new WaitUntil(()=> conn.IsCompleted);
+			var bytes = new byte[1024 * 4];
+			var result = ws.ReceiveAsync(bytes, default);
+			yield return new WaitUntil(()=> result.IsCompleted);
+
+			var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
+			Debug.Log(str);
+			StartCoroutine(dispatchMeshGeneration(str));
+		}
+	}
+
+	public IEnumerator getEncodedCoords(double lat, double lon ){
+		//send translate coords
+		Uri uri = new(connection_string+"translate");
+		using (ClientWebSocket ws = new ClientWebSocket()){
+			var conn= ws.ConnectAsync(uri, default);
+			yield return new WaitUntil(()=> conn.IsCompleted);
+			var send = new TranslateRequest(lat, lon);
+			string json = JsonSerializer.Serialize<TranslateRequest>(send, json_options);
+			ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(json)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
+			var bytes = new byte[1024 * 4];
+			var result = ws.ReceiveAsync(bytes, default);
+			yield return new WaitUntil(()=> result.IsCompleted);
+			var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
+			//return decodeJSONPoint(str)
+			TranslateRequest ret = decodeJSONPoint(str);
+			coords_internal = ret;
+			
+		}
+	}
+	
+	public IEnumerator GetMesh(Vector3 coords, double range){
+		Uri uri = new(connection_string+"mesh");
+		using (ClientWebSocket ws = new ClientWebSocket()){
+			
+			var conn= ws.ConnectAsync(uri, default);
+			yield return new WaitUntil(()=> conn.IsCompleted);
+			MeshRequest send = new MeshRequest(coords.x, coords.z, range);
+			
+			string json = JsonSerializer.Serialize(send, json_options);
+			//string json = $"{{\"lat\":{coords.x}, \"lon\":{coords.z}, \"range\": {range} }}";
+			//sometimes you just need a little less gun
+			//string json = "{\"lat\":39.706731731638236, \"lon\":-8.762576195269904, \"range\": 10}";
+			Debug.Log(json);
+			ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(json)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
+			var bytes = new byte[1024 * 4];
+			
+			var result = ws.ReceiveAsync(bytes, default);
+			yield return new WaitUntil(()=> result.IsCompleted);
+			
+			var s = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
 			Debug.Log(s);
-			StartCoroutine(parsingCoordinates(s));
+			StartCoroutine(dispatchMeshGeneration(s));
 
 		
 			//string is json
@@ -132,7 +219,13 @@ public class UrbanGenerator : MonoBehaviour{
 
 		}
 	}
-	public IEnumerator parsingCoordinates(string s){
+	public TranslateRequest decodeJSONPoint(string s){
+		Point p = JsonSerializer.Deserialize<Point>(s, json_options);
+		TranslateRequest k = new TranslateRequest(p.Coordinate.Y, p.Coordinate.X);
+		return k;
+
+	}
+	public IEnumerator dispatchMeshGeneration(string s){
 		
 		List<Buildings> values = JsonSerializer.Deserialize<List<Buildings>>(s, json_options);
 		foreach (Buildings item in values){

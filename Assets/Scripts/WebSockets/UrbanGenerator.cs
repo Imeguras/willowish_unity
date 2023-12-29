@@ -29,9 +29,16 @@ public class TranslateRequest{
 	}
 }
 public class MeshRequest{
-	public double lat;
-	public double lon;
-	public double range;
+	public double lat{get; set;}
+	public double lon{get; set;}
+	public double range{get; set;}
+	public MeshRequest(double lat, double lon, double range){
+		this.lat= lat; 
+		this.lon= lon;
+		this.range= range;
+	}
+	public MeshRequest():this(0,0,0){
+	}
 }
     //TODO Might have to be rewritten entirely 
 public class UrbanGenerator : MonoBehaviour{
@@ -50,8 +57,11 @@ public class UrbanGenerator : MonoBehaviour{
 	private const string ws_config_EXAMPLE = "Assets/Scripts/WebSockets/ws_config_EXAMPLE.xml";
 	[SerializeField]
 	private string connection_string = "";
+	[SerializeField]
+	private static TranslateRequest coords_internal; 
 	//TODO: test this in binbows
 	void OnEnable(){
+		coords_internal= new TranslateRequest(0,0);
 		json_options.Converters.Add(new NetTopologySuite.IO.Converters.GeoJsonConverterFactory());
 		try{
 				//fetch ws_config from xml from ws_config
@@ -87,23 +97,34 @@ public class UrbanGenerator : MonoBehaviour{
 		
 	}
     void Start(){
-		var latency = StartCoroutine(CheckLatency());
-		TranslateRequest coordsMetricSRID = new TranslateRequest(0,0);
-		coordsMetricSRID=getEncodedCoords(39.706731731638236, -8.762576195269904).Result; 
+		StartCoroutine(threadedStart());
+		//{"lat":39.706731731638236, "lon":-8.762576195269904, "range": 100}
+		//
+
+    }
+	private IEnumerator threadedStart(){
+		//GOD THIS IS EVEN WORSE WHY DID MICROSOFT REMOVE SYNCHRONOUS CALLS LIKE ITS A DEPRECATED THING
+		//ALSO THANK YOU UNITY FOR BEING SO HOSTILE TO ASYNC CALLS
+
+		StartCoroutine(CheckLatency());
+		Vector3 coord_initial = new Vector3((float)39.706731731638236, 0,(float)-8.762576195269904);
+		StartCoroutine(getEncodedCoords(coord_initial.x, coord_initial.z)); 
 		
-		
+		//this is what microsoft forced me to do 
+		//while(coords_internal.lat == 0 && coords_internal.lon == 0){}
+		yield return new WaitUntil(()=> coords_internal.lat != 0 && coords_internal.lon != 0);
+
+		TranslateRequest coordsMetricSRID = coords_internal;
 		 
 		//Beware Longitude is X and latitude is Y in GIS software
 		//SEE https://gis.stackexchange.com/questions/11626/does-y-mean-latitude-and-x-mean-longitude-in-every-gis-software
 		var coords_vector = new Vector3((float)coordsMetricSRID.lon,0,(float)coordsMetricSRID.lat);
-		//MeshGeneratorAid.setup(coords_vector);
-		
-		//{"lat":39.706731731638236, "lon":-8.762576195269904, "range": 100}
-		//StartCoroutine(GetMesh(coords_vector, 10)); 
+		MeshGeneratorAid.setup(coords_vector);
+		//This is because the websocket takes in a degree based latitude/longitude
+		StartCoroutine(GetMesh(coord_initial, 10)); 
 		//StartCoroutine(GetCube());
 
-
-    }
+	}
 	
 	public IEnumerator CheckLatency(){
 	 	
@@ -116,15 +137,18 @@ public class UrbanGenerator : MonoBehaviour{
 			using (ClientWebSocket ws = new ClientWebSocket()){
 				var conn= ws.ConnectAsync(uri, default);
 				yield return new WaitUntil(()=> conn.IsCompleted);
-				ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(Time.deltaTime.ToString())), System.Net.WebSockets.WebSocketMessageType.Text, true, default);				
+				var t= Time.fixedTime.ToString();
+				ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(t)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);				
 				var bytes = new byte[1024 * 4];
 				var result =  ws.ReceiveAsync(bytes, default);
 				yield return new WaitUntil(()=> result.IsCompleted);
 				var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
 				float.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out checkmark);
-				latency = (double)((checkmark*1000)-(Time.deltaTime*1000));
-				Debug.Log("Latency: "+latency);
-				yield return latency; 
+				
+				latency = (double)((checkmark*1000)-(Time.fixedTime*1000));
+				
+				Debug.Log("Latency(ms): "+latency);
+				
 			}
 			
 		
@@ -146,21 +170,23 @@ public class UrbanGenerator : MonoBehaviour{
 		}
 	}
 
-	public async Task<TranslateRequest> getEncodedCoords(double lat, double lon ){
+	public IEnumerator getEncodedCoords(double lat, double lon ){
 		//send translate coords
 		Uri uri = new(connection_string+"translate");
 		using (ClientWebSocket ws = new ClientWebSocket()){
-			await ws.ConnectAsync(uri, default);
+			var conn= ws.ConnectAsync(uri, default);
+			yield return new WaitUntil(()=> conn.IsCompleted);
 			var send = new TranslateRequest(lat, lon);
 			string json = JsonSerializer.Serialize<TranslateRequest>(send, json_options);
-			await ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(json)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
+			ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(json)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
 			var bytes = new byte[1024 * 4];
-			var result = await ws.ReceiveAsync(bytes, default);
-			var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Count);
+			var result = ws.ReceiveAsync(bytes, default);
+			yield return new WaitUntil(()=> result.IsCompleted);
+			var str = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
 			//return decodeJSONPoint(str)
 			TranslateRequest ret = decodeJSONPoint(str);
-			//from completed ret
-			 return ret; 
+			coords_internal = ret;
+			
 		}
 	}
 	
@@ -170,16 +196,12 @@ public class UrbanGenerator : MonoBehaviour{
 			
 			var conn= ws.ConnectAsync(uri, default);
 			yield return new WaitUntil(()=> conn.IsCompleted);
-			var send = new MeshRequest{
-				lat = coords.x,
-				//TODO fix this
-				lon = coords.z,
-				range = range
-			};
-			//string json = JsonSerializer.Serialize<MeshRequest>(send, json_options);
+			MeshRequest send = new MeshRequest(coords.x, coords.z, range);
+			
+			string json = JsonSerializer.Serialize(send, json_options);
 			//string json = $"{{\"lat\":{coords.x}, \"lon\":{coords.z}, \"range\": {range} }}";
 			//sometimes you just need a little less gun
-			string json = "{\"lat\":39.706731731638236, \"lon\":-8.762576195269904, \"range\": 10}";
+			//string json = "{\"lat\":39.706731731638236, \"lon\":-8.762576195269904, \"range\": 10}";
 			Debug.Log(json);
 			ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(json)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
 			var bytes = new byte[1024 * 4];

@@ -193,24 +193,26 @@ public class UrbanGenerator : MonoBehaviour{
 	public IEnumerator GetMesh(Vector3 coords, double range){
 		Uri uri = new(connection_string+"mesh");
 		using (ClientWebSocket ws = new ClientWebSocket()){
-			
+			var bytes = new byte[1024 * 4];
 			var conn= ws.ConnectAsync(uri, default);
 			yield return new WaitUntil(()=> conn.IsCompleted);
 			MeshRequest send = new MeshRequest(coords.x, coords.z, range);
 			
 			string json = JsonSerializer.Serialize(send, json_options);
-			//string json = $"{{\"lat\":{coords.x}, \"lon\":{coords.z}, \"range\": {range} }}";
-			//sometimes you just need a little less gun
-			//string json = "{\"lat\":39.706731731638236, \"lon\":-8.762576195269904, \"range\": 10}";
+			
 			Debug.Log(json);
 			ws.SendAsync(new ArraySegment<byte>(System.Text.Encoding.UTF8.GetBytes(json)), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
-			var bytes = new byte[1024 * 4];
+			using var stream = new MemoryStream();
+			var segment = new ArraySegment<byte>(bytes);
+    		var result = default(WebSocketReceiveResult);
+			do{
+				
+			 	result = ws.ReceiveAsync(segment, default).Result;
+				stream.Write(segment.Array, segment.Offset, result.Count);
+			}while(!result.EndOfMessage);
 			
-			var result = ws.ReceiveAsync(bytes, default);
-			yield return new WaitUntil(()=> result.IsCompleted);
+			var s = System.Text.Encoding.UTF8.GetString(stream.ToArray(), 0, stream.ToArray().Length);
 			
-			var s = System.Text.Encoding.UTF8.GetString(bytes, 0, result.Result.Count);
-			Debug.Log(s);
 			StartCoroutine(dispatchMeshGeneration(s));
 
 		

@@ -50,50 +50,62 @@ public static class MeshGeneratorAid {
 	//TODO: this is garbage and needs to be cleaned up
 	//TOOPTIMIZE: this could be done via shader which will balance the load 
 	public static void UpdateMesh(Buildings building){
-		Mesh mesher = new Mesh();
+		try{
+			Mesh mesher = new Mesh();
 
-		
-		int len_v = building.geom.Coordinates.Length-1;
-		int count = len_v-1;
+			
+			int len_v = building.geom.Coordinates.Length-1;
+			int count = len_v-1;
 
-		List<Vector3> new_vertices = new List<Vector3>();
+			List<Vector3> new_vertices = new List<Vector3>();
 
-		foreach(var coord in building.geom.Coordinates){
-			var localX = (float)coord.X - pos_spawn.x;
-			var localY = (float)coord.Y - pos_spawn.z;
-			//the incoming order is anticlockwise from the bottom right corner
-			var new_vct = new Vector3((float)localX, (float)0, (float)localY);
-			new_vertices.Add(new_vct);
-		}
-		//remove last 
-		new_vertices.RemoveAt(new_vertices.Count-1);
-		//reverse the order
-		new_vertices.Reverse();
-		
-
-		List<List<Vector3>> listOfFaces = generate25Dvertices(new_vertices, building.height);
-		//create new List with every vertice from listOffaces
-		List<Vector3> listOfVertices = new List<Vector3>();
-		foreach(var face in listOfFaces){
-			foreach(var vertex in face){
-				listOfVertices.Add(vertex);
+			foreach(var coord in building.geom.Coordinates){
+				var localX = (float)coord.X - pos_spawn.x;
+				var localY = (float)coord.Y - pos_spawn.z;
+				//the incoming order is anticlockwise from the bottom right corner
+				var new_vct = new Vector3((float)localX, (float)0, (float)localY);
+				new_vertices.Add(new_vct);
 			}
-		}
+			//remove last 
+			new_vertices.RemoveAt(new_vertices.Count-1);
+			//reverse the order
+			new_vertices.Reverse();
+			
 
-		mesher.SetVertices(listOfVertices.ToArray());
-		
-		List<int> new_triangles = deconstructAndTriangulateThree(listOfFaces);
-		mesher.SetTriangles(new_triangles.ToArray(),0);
+			List<List<Vector3>> listOfFaces = generate25Dvertices(new_vertices, building.height);
+			//create new List with every vertice from listOffaces
+			List<Vector3> listOfVertices = new List<Vector3>();
+			foreach(var face in listOfFaces){
+				foreach(var vertex in face){
+					listOfVertices.Add(vertex);
+				}
+			}
 
-		meshFilter.mesh = mesher;
-		
-		mesher.RecalculateNormals();
-		//uvs
-		List<Vector2> uvs = new List<Vector2>();
-		foreach(var vertex in listOfVertices){
-			uvs.Add(new Vector2(vertex.x, vertex.z));
-		}
-		mesher.SetUVs(0, uvs);
+			mesher.SetVertices(listOfVertices.ToArray());
+			
+			List<int> new_triangles = deconstructAndTriangulateThree(listOfFaces);
+			mesher.SetTriangles(new_triangles.ToArray(),0);
+
+			
+			
+			
+			//uvs
+			List<Vector2> uvs = new List<Vector2>();
+			foreach(var vertex in listOfVertices){
+				uvs.Add(new Vector2(vertex.x, vertex.z));
+			}
+			mesher.SetUVs(0, uvs);
+			
+			Mesh result = new Mesh();
+			result.CombineMeshes(new CombineInstance[]{new CombineInstance{mesh = mesher}, new CombineInstance{mesh = meshFilter.mesh}}, true, false, false);
+			meshFilter.mesh = Mesh.Instantiate(result);
+			meshFilter.mesh.RecalculateNormals();
+			
+		}catch(Exception e){
+			Debug.Log("Error in mesh generation");
+			Debug.Log(e);
+		}	
+		//meshFilter.mesh = mesher;
 	}
 	
 	static List<int> Triangulate(List<Vector3> vertices){

@@ -107,7 +107,13 @@ public class UrbanGenerator : MonoBehaviour{
 		//ALSO THANK YOU UNITY FOR BEING SO HOSTILE TO ASYNC CALLS
 
 		StartCoroutine(CheckLatency());
-		Vector3 coord_initial = new Vector3((float)39.706731731638236, 0,(float)-8.762576195269904);
+		//estadio 
+		//(float) 39.748729392674875, 0,(float) -8.812966407089867 
+		//casa de alguem 
+		///39.706731731638236, 0,(float)-8.762576195269904 
+		//praça rodrigues lobo? 
+		//39.74451856149207, -8.80807660900398  
+		Vector3 coord_initial = new Vector3((float) 39.748729392674875, 0,(float) -8.812966407089867 );
 		StartCoroutine(getEncodedCoords(coord_initial.x, coord_initial.z)); 
 		
 		//this is what microsoft forced me to do 
@@ -121,7 +127,7 @@ public class UrbanGenerator : MonoBehaviour{
 		var coords_vector = new Vector3((float)coordsMetricSRID.lon,0,(float)coordsMetricSRID.lat);
 		MeshGeneratorAid.setup(coords_vector);
 		//This is because the websocket takes in a degree based latitude/longitude
-		StartCoroutine(GetMesh(coord_initial, 10)); 
+		StartCoroutine(GetMesh(coord_initial, 500)); 
 		//StartCoroutine(GetCube());
 
 	}

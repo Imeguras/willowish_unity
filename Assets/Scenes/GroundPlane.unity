@@ -140,7 +140,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!108 &413882121
 Light:
   m_ObjectHideFlags: 0
@@ -237,7 +237,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &597718483
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -356,7 +356,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1070704367
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -491,6 +491,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: CanvasLog
+      objectReference: {fileID: 0}
+    - target: {fileID: 740805128902284681, guid: ab44051424071ed498cf2c79dd3ac8d5,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 740805128902284685, guid: ab44051424071ed498cf2c79dd3ac8d5,
         type: 3}
@@ -632,7 +637,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1808521266
 MonoBehaviour:
   m_ObjectHideFlags: 0
